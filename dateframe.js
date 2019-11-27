@@ -9,7 +9,7 @@ const data = [
 ];
 
 const target = [
-    { pName: 'Mouse', UK: 550, US: 0}
+    { pName: 'Mouse', UK: 550, US: 0 }
 ];
 
 const gRows = Symbol('gRows');
@@ -41,6 +41,16 @@ class DataFrame {
         for (let column of columns) {
             const g = this.groupBy(column);
         }
+    }
+
+    select(expr) {
+        const fn = parser(lexer(expr));
+
+        const data = this.data.map(row => {
+            return { [expr]: fn(row) }
+        });
+
+        return new DataFrame(data);
     }
 }
 
@@ -88,7 +98,47 @@ const aggFn = {
     }
 };
 
-console.log(new DataFrame(data)
-    .groupBy('pId')
-    .groupBy('country')
-    .agg(aggFn.sum('quantity')));
+// console.log(new DataFrame(data)
+//     .groupBy('pId')
+//     .groupBy('country')
+//     .agg(aggFn.sum('quantity')));
+
+function lexer(expr) {
+    const tokens = [];
+    for (let word of expr.split(/\s+/)) {
+        if(word.match(/^[a-zA-Z][\w]+$/) /* [a-zA-Z0-9_] */) {
+            tokens.push({ type: 'identifier', value: word })
+        } else if(word.match(/[\+\-\*\/]/) /* + * - / */) {
+            tokens.push({ type: 'operator', value: word})
+        } else if(word.match(/\d+/) /* only support integer TODO support double*/) {
+            tokens.push({ type: 'literal', value: word})
+        }
+    }
+    return tokens;
+}
+
+function parser(tokens) {
+    let str = "return ";
+    for (let {type, value} of tokens) {
+        switch (type) {
+            case 'identifier': {
+                str += `row['${value}'] `;
+                break;
+            }
+            default: {
+                str += `${value} `
+            }
+        }
+    }
+    return new Function('row', str);
+}
+
+// console.log(
+//     parser(lexer('quantity + 1'))
+// )
+
+console.log(
+    new DataFrame(data).select('0 / 0', 'quantity')
+);
+
+// quantity + 1 这个是一个Expression -> row

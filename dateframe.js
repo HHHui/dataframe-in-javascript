@@ -1,17 +1,18 @@
 const data = [
-    {pId: 'P1', pName: 'PenDrive', quantity: 50,  country: 'US'},
-    {pId: 'P1', pName: 'PenDrive', quantity: 100,  country: 'UK'},
-    {pId: 'P2', pName: 'Mouse',    quantity: 100, country: 'UK'},
-    {pId: 'P3', pName: 'KeyBoard', quantity: 250, country: 'US'},
-    {pId: 'P1', pName: 'PenDrive', quantity: 300, country: 'US'},
-    {pId: 'P2', pName: 'Mouse',    quantity: 450, country: 'UK'},
-    {pId: 'P5', pName: 'Dvd',      quantity: 50,  country: 'UAE'}
+    {pId: 'P1', pName: 'PenDrive', quantity: 50,  country: 'US', gRows: 'US'},
+    {pId: 'P1', pName: 'PenDrive', quantity: 100, country: 'UK', gRows: 'UK'},
+    {pId: 'P2', pName: 'Mouse',    quantity: 100, country: 'UK', gRows: 'UK'},
+    {pId: 'P3', pName: 'KeyBoard', quantity: 250, country: 'US', gRows: 'US'},
+    {pId: 'P1', pName: 'PenDrive', quantity: 300, country: 'US', gRows: 'US'},
+    {pId: 'P2', pName: 'Mouse',    quantity: 450, country: 'UK', gRows: 'UK'},
+    {pId: 'P5', pName: 'Dvd',      quantity: 50,  country: 'UAE', gRows: 'UAE'}
 ];
 
 const target = [
     { pName: 'Mouse', UK: 550, US: 0}
 ];
 
+const gRows = Symbol('gRows');
 
 // [ Row, Row, Row ]
 class DataFrame {
@@ -30,7 +31,7 @@ class DataFrame {
         }, {});
 
         const g2 = Object.entries(g).map(([colValue, rows])=>
-            ({ [column]: rows[0][column], rows })
+            ({ [column]: rows[0][column], [gRows]: rows })
         );
 
         return new GroupDataFrame(g2);
@@ -59,11 +60,11 @@ class GroupDataFrame {
     // ]
     groupBy(column) {
         const gData = this.gData.flatMap(gRow => {
-            const { rows, ...rest } = gRow;
+            const { [gRows]: rows, ...rest } = gRow;
             return new DataFrame(rows).groupBy(column).gData.map(gRow => ({ ...rest, ...gRow }));
         });
         return new GroupDataFrame(gData);
     }
 }
 
-console.log(new DataFrame(data).groupBy('pId').groupBy('country').gData );
+console.log(new DataFrame(data).groupBy('pId').groupBy('gRows'));

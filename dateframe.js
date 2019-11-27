@@ -65,6 +65,30 @@ class GroupDataFrame {
         });
         return new GroupDataFrame(gData);
     }
+
+    agg(fn) {
+        const data = this.gData.map(gRow => {
+            const { [gRows]: rows, ...rest } = gRow;
+            return { ...rest, ...fn(rows) }
+        });
+        return new DataFrame(data);
+    }
 }
 
-console.log(new DataFrame(data).groupBy('pId').groupBy('gRows'));
+const aggFn = {
+    sum: (column) => (rows) => {
+        const newColumn = `sum(${column})`;
+        return rows.reduce((ret, row) => {
+            if(!ret[newColumn]){
+                ret[newColumn] = 0;
+            }
+            ret[newColumn] = ret[newColumn] + row[column];
+            return ret;
+        }, {});
+    }
+};
+
+console.log(new DataFrame(data)
+    .groupBy('pId')
+    .groupBy('country')
+    .agg(aggFn.sum('quantity')));

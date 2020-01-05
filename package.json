@@ -1,0 +1,26 @@
+{
+  "name": "dataframe-in-javascript",
+  "version": "1.0.0",
+  "main": "data.js",
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/core": "^7.7.7",
+    "@babel/preset-env": "^7.7.7",
+    "babel-jest": "^24.9.0",
+    "jest": "^24.9.0"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HHHui/dataframe-in-javascript.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/HHHui/dataframe-in-javascript/issues"
+  },
+  "homepage": "https://github.com/HHHui/dataframe-in-javascript#readme"
+}

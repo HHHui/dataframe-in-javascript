@@ -1,4 +1,4 @@
-import { DataFrame, GroupDataFrame, gRows, aggFn } from "./dataframe";
+import { DataFrame, GroupDataFrame, gRows, aggFn, col } from "./dataframe";
 
 
 const data = [
@@ -93,6 +93,15 @@ test('groupDataframe pivot', () => {
     
     expect(df.rows).toStrictEqual([
         { date: '2020-01-01', foo: 3, bar: 7 },
+    ])
+})
+
+test('groupDataframe pivot rename', () => {
+    const df = new DataFrame(data).groupBy('date').pivot(col('name').as('${cv}Value'), aggFn.sum('value'))
+
+    expect(df.rows).toStrictEqual([
+        { date: '2020-01-01', fooValue: 1, barValue: 2 },
+        { date: '2020-01-02', fooValue: 3, barValue: 4 },
     ])
 })
 

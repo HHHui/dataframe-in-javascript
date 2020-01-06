@@ -98,19 +98,19 @@ export class GroupDataFrame {
         if (typeof col === 'string') {
             col = new Col(col);
         }
-        const newColumnNames = this.df.getValues(col.column);
+        const newColumnNames = this.df.getValues(col.name);
         // if col as exists
         const newColumnNameMappings = col.renameTemplate ? 
             newColumnNames.reduce((prev, cv) => {
                 prev[cv] = col.transform(cv);
                 return prev;
             }, {}) : null;
-        
+
         if (!Array.isArray(aggFns)) {
             aggFns = [aggFns];
         }
 
-        const datas = aggFns.map(aggFn => this._pivotAgg(col.column, newColumnNames, aggFn, newColumnNameMappings));
+        const datas = aggFns.map(aggFn => this._pivotAgg(col.name, newColumnNames, aggFn, newColumnNameMappings));
         
         if (datas.length > 1) {
             return datas.map(data => new DataFrame(data));
@@ -137,7 +137,7 @@ export class GroupDataFrame {
                 ret[newColumnName] = df.agg(aggFn);
                 return ret;
             }, newRowInit);
-            
+
             // if col as exists
             if(newColumnNameMappings) {
                 newRow = newColumnNames.reduce((ret, colName) => {
@@ -161,8 +161,8 @@ export class GroupDataFrame {
 }
 
 export class Col {
-    constructor(column) {
-        this.column = column;
+    constructor(name) {
+        this.name = name;
     }
     as(renameTemplate) {
         this.renameTemplate = renameTemplate;
@@ -174,8 +174,8 @@ export class Col {
     }
 }
 
-export function col(column) {
-    return new Col(column);
+export function col(name) {
+    return new Col(name);
 }
 
 export const aggFn = {

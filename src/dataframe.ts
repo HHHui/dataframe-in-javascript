@@ -1,17 +1,36 @@
+import './polyfill';
+
 export const gRows = Symbol('gRows');
+
+interface Row {
+    [k: string]: any
+}
+interface Values {
+    [k: string]: any[]
+}
+interface AggFn {
+    (df: DataFrame): [string, any]
+}
+interface Group {
+    [gRows]: DataFrame;
+    [k: string]: any;
+}
+interface NameMapping {
+    [k: string]: string
+}
 
 // [ Row, Row, Row ]
 export class DataFrame {
-    rows: Object[];
-    values: Object = {};
+    rows: Row[];
+    values: Values;
 
-    constructor(rows: Object[]) {
+    constructor(rows: Row[]) {
         this.rows = rows;
         this.values = {};
     }
 
     groupBy(column: string) {
-        const g = this.rows.reduce((g, row) => {
+        const g = this.rows.reduce((g: Values, row) => {
             if(g[row[column]]) {
                 g[row[column]].push(row);
             } else {
@@ -37,12 +56,12 @@ export class DataFrame {
         return new DataFrame(rows);
     }
 
-    agg(fn) {
+    agg(fn: AggFn) {
         return fn(this)[1];
     }
 
     // the order may need to reconsider.
-    getValues(column) {
+    getValues(column: string) {
         if (!this.values[column]) {
             const set = new Set();
             this.rows.forEach(row => {
@@ -56,10 +75,8 @@ export class DataFrame {
     }
 }
 
-interface Group {
-    [key: string]: any;
-    [gRows]: DataFrame
-}
+
+
 // [
 //   { pId: 'P1', rows: DataFrame }
 //   { pId: 'P2', rows: DataFrame }
@@ -79,7 +96,7 @@ export class GroupDataFrame {
     //   { pId: 'P1', country: 'US', rows: [Row] }
     //   { pId: 'P1', country: 'UK', rows: [Row, Row] }
     // ]
-    groupBy(column) {
+    groupBy(column: string) {
         const gData = this.gData.flatMap(gRow => {
             const { [gRows]: dataFrame, ...rest } = gRow;
             return dataFrame.groupBy(column).gData.map(gRow => ({ ...rest, ...gRow }));
@@ -89,11 +106,11 @@ export class GroupDataFrame {
     
     // pivot
     // 将columnToPivot这一列数据，变成新的列，数据聚合内容
-    pivot(col, aggFns) {
+    pivot(nameOrCol: string | Col, aggFns: AggFn): DataFrame;
+    pivot(nameOrCol: string | Col, aggFns: AggFn[]): DataFrame[];
+    pivot(nameOrCol: string | Col, aggFns: AggFn | AggFn[]) {
         // 提前遍历获得所有新列名，保证行数据的完整性 test: groupDataframe pivot with uncompelete data
-        if (typeof col === 'string') {
-            col = new Col(col);
-        }
+        const col = toCol(nameOrCol);
         const newColumnNames = this.df.getValues(col.name);
         // if col as exists
         const newColumnNameMappings = col.renameTemplate ? 
@@ -117,26 +134,26 @@ export class GroupDataFrame {
 
     // [{ date: '01', [gRows]: df } { date: '02', [gRows]: df }]
     // [{ date: '01', foo: 1, bar: 2 } { date: '02', foo: 3, bar: 4 }]
-    _pivotAgg(columnToPivot: string, newColumnNames: string[], aggFn, newColumnNameMappings: { [key: string]: string }) {
+    _pivotAgg(columnToPivot: string, newColumnNames: string[], aggFn: AggFn, newColumnNameMappings: NameMapping) {
         return this.gData.map(gRow => {
             const { [gRows]: df, ...groups } = gRow;
             // { name: 'foo',  [gRows]: } { name: 'bar',  [gRows]: }
             // { foo: aggFn(foo's rows), bar: aggFn(bar's rows)}
             const gdf = df.groupBy(columnToPivot);
 
-            const newRowInit = newColumnNames.reduce((ret, name) => {
+            const newRowInit = newColumnNames.reduce((ret: Row, name) => {
                 ret[name] = 0;
                 return ret;
             }, {});
 
-            let newRow = gdf.gData.reduce((ret, { [columnToPivot]: newColumnName, [gRows]: df }) => {
+            let newRow = gdf.gData.reduce((ret: Row, { [gRows]: df, [columnToPivot]: newColumnName }) => {
                 ret[newColumnName] = df.agg(aggFn);
                 return ret;
             }, newRowInit);
 
             // if col as exists
             if(newColumnNameMappings) {
-                newRow = newColumnNames.reduce((ret, colName) => {
+                newRow = newColumnNames.reduce((ret: Row, colName) => {
                     ret[newColumnNameMappings[colName]] = newRow[colName];
                     return ret;
                 }, {});
@@ -146,7 +163,7 @@ export class GroupDataFrame {
         });
     }
 
-    agg(fn) {
+    agg(fn: AggFn) {
         const data = this.gData.map(gRow => {
             const { [gRows]: dataFrame, ...rest } = gRow;
             const [key, value] = fn(dataFrame);
@@ -158,7 +175,7 @@ export class GroupDataFrame {
 
 export class Col {
     name: string;
-    renameTemplate: string;
+    renameTemplate?: string;
 
     constructor(name: string) {
         this.name = name;
@@ -167,25 +184,38 @@ export class Col {
         this.renameTemplate = renameTemplate;
         return this;
     }
-    transform(curValue) {
+    transform(curValue: any) {
         if(!this.renameTemplate) return curValue;
         return this.renameTemplate.replace('${cv}', curValue);
     }
 }
 
-export function col(name) {
+function toCol(nameOrCol: string | Col): Col {
+    if(nameOrCol instanceof Col) {
+        return nameOrCol;
+    } else {
+        return new Col(nameOrCol);
+    }
+}
+
+export function col(name: string) {
     return new Col(name);
 }
 
 export const aggFn = {
-    sum: (column) => ({ rows }) => {
+    sum: (column: string) => (df: DataFrame): [string, number] => {
+        const { rows } = df;
         const key = `sum(${column})`;
         const value = rows.reduce((prev, row) => prev + (row[column] || 0), 0);
         return [key, value];
     }
 };
 
-function lexer(expr) {
+interface Token {
+    type: string,
+    value: any
+}
+function lexer(expr: string): Token[] {
     const tokens = [];
     for (let word of expr.split(/\s+/)) {
         if(word.match(/^[a-zA-Z][\w]+$/) /* [a-zA-Z0-9_] */) {
@@ -199,7 +229,7 @@ function lexer(expr) {
     return tokens;
 }
 
-function parser(tokens) {
+function parser(tokens: Token[]) {
     let str = "return ";
     for (let {type, value} of tokens) {
         switch (type) {

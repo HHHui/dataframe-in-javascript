@@ -12,6 +12,7 @@ export const gRows = Symbol('gRows');
 export class DataFrame {
     constructor(rows) {
         this.rows = rows;
+        this.values = {};
     }
 
     groupBy(column) {
@@ -28,7 +29,7 @@ export class DataFrame {
             ({ [column]: rows[0][column], [gRows]: new DataFrame(rows) })
         );
 
-        return new GroupDataFrame(g2);
+        return new GroupDataFrame(this, g2);
     }
 
     groupBys(columns) {
@@ -51,14 +52,18 @@ export class DataFrame {
         return fn(this)[1];
     }
 
+    // the order may need to reconsider.
     getValues(column) {
-        const set = new Set();
-        this.rows.forEach(row => {
-            if(row[column] != null) {
-                set.add(row[column])
-            }
-        });
-        return Array.from(set);
+        if (!this.values[column]) {
+            const set = new Set();
+            this.rows.forEach(row => {
+                if(row[column] != null) {
+                    set.add(row[column])
+                }
+            });
+            this.values[column] = Array.from(set);
+        }
+        return this.values[column];
     }
 }
 
@@ -67,7 +72,8 @@ export class DataFrame {
 //   { pId: 'P2', rows: DataFrame }
 // ]
 export class GroupDataFrame {
-    constructor(gData) {
+    constructor(dataframe, gData) {
+        this.df = dataframe;
         this.gData = gData;
     }
 
@@ -82,14 +88,14 @@ export class GroupDataFrame {
             const { [gRows]: dataFrame, ...rest } = gRow;
             return dataFrame.groupBy(column).gData.map(gRow => ({ ...rest, ...gRow }));
         });
-        return new GroupDataFrame(gData);
+        return new GroupDataFrame(this.df, gData);
     }
     
     // pivot
     // 将columnToPivot这一列数据，变成新的列，数据聚合内容
     pivot(columnToPivot, aggFn) {
         // 提前遍历获得所有新列名，保证行数据的完整性 test: groupDataframe pivot with uncompelete data
-        const newColumnNames = this.getValues(columnToPivot);
+        const newColumnNames = this.df.getValues(columnToPivot);
         
         const data = this.gData.map(gRow => {
             const { [gRows]: df, ...rest } = gRow;
@@ -121,11 +127,6 @@ export class GroupDataFrame {
             return { ...rest, [key]: value };
         });
         return new DataFrame(data);
-    }
-
-    getValues(column) {
-        const values = this.gData.flatMap(gRow => gRow[gRows].getValues(column));
-        return Array.from(new Set(values));
     }
 }
 

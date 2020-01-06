@@ -22,6 +22,20 @@ test('dataframe groupBy', () => {
     ]);
 });
 
+test('dataframe getValues', () => {
+    const data = [
+        { date: '2020-01-01', name: 'foo' },
+        { date: '2020-01-01', name: undefined },
+        { date: '2020-01-01', name: null },
+        { date: '2020-01-02', name: 'bar' }
+    ]
+    const df = new DataFrame(data);
+    const values = df.getValues('name');
+    expect(new Set(values)).toEqual(new Set(['foo', 'bar']));
+    
+    expect(values).toBe(df.values['name'])
+})
+
 // select expr
 test('dataframe select one cloumn', () => {
     const df = new DataFrame(data).select('name');
@@ -133,13 +147,9 @@ test('groupDataframe agg sum with data has null value', () => {
     ])
 })
 
-test('groupDataframe getValues', () => {
-    const data = [
-        { date: '2020-01-01', name: 'foo' },
-        { date: '2020-01-01', name: undefined },
-        { date: '2020-01-01', name: null },
-        { date: '2020-01-02', name: 'bar' }
-    ]
-    const values = new DataFrame(data).groupBy('date').getValues('name');
-    expect(new Set(values)).toEqual(new Set(['foo', 'bar']));
-})
+test('groupDataframe should have its parent dataframe ref', () => {
+    const df = new DataFrame(data);
+    const gdf = df.groupBy('date');
+
+    expect(gdf.df).toBe(df);
+});

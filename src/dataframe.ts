@@ -1,21 +1,16 @@
-const flatMap = (f,xs) =>
-  xs.map(f).reduce((x,y) => x.concat(y), [])
-
-Array.prototype.flatMap = function(f) {
-  return flatMap(f,this)
-}
-
-
 export const gRows = Symbol('gRows');
 
 // [ Row, Row, Row ]
 export class DataFrame {
-    constructor(rows) {
+    rows: Object[];
+    values: Object = {};
+
+    constructor(rows: Object[]) {
         this.rows = rows;
         this.values = {};
     }
 
-    groupBy(column) {
+    groupBy(column: string) {
         const g = this.rows.reduce((g, row) => {
             if(g[row[column]]) {
                 g[row[column]].push(row);
@@ -32,13 +27,7 @@ export class DataFrame {
         return new GroupDataFrame(this, g2);
     }
 
-    groupBys(columns) {
-        for (let column of columns) {
-            const g = this.groupBy(column);
-        }
-    }
-
-    select(expr) {
+    select(expr: string) {
         const fn = parser(lexer(expr));
 
         const rows = this.rows.map(row => {
@@ -67,12 +56,19 @@ export class DataFrame {
     }
 }
 
+interface Group {
+    [key: string]: any;
+    [gRows]: DataFrame
+}
 // [
 //   { pId: 'P1', rows: DataFrame }
 //   { pId: 'P2', rows: DataFrame }
 // ]
 export class GroupDataFrame {
-    constructor(dataframe, gData) {
+    df: DataFrame;
+    gData: Group[];
+
+    constructor(dataframe: DataFrame, gData: Group[]) {
         this.df = dataframe;
         this.gData = gData;
     }
@@ -121,7 +117,7 @@ export class GroupDataFrame {
 
     // [{ date: '01', [gRows]: df } { date: '02', [gRows]: df }]
     // [{ date: '01', foo: 1, bar: 2 } { date: '02', foo: 3, bar: 4 }]
-    _pivotAgg(columnToPivot, newColumnNames, aggFn, newColumnNameMappings) {
+    _pivotAgg(columnToPivot: string, newColumnNames: string[], aggFn, newColumnNameMappings: { [key: string]: string }) {
         return this.gData.map(gRow => {
             const { [gRows]: df, ...groups } = gRow;
             // { name: 'foo',  [gRows]: } { name: 'bar',  [gRows]: }
@@ -161,10 +157,13 @@ export class GroupDataFrame {
 }
 
 export class Col {
-    constructor(name) {
+    name: string;
+    renameTemplate: string;
+
+    constructor(name: string) {
         this.name = name;
     }
-    as(renameTemplate) {
+    as(renameTemplate: string) {
         this.renameTemplate = renameTemplate;
         return this;
     }

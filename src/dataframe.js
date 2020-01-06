@@ -93,15 +93,29 @@ export class GroupDataFrame {
     
     // pivot
     // 将columnToPivot这一列数据，变成新的列，数据聚合内容
-    pivot(columnToPivot, aggFn) {
+    pivot(columnToPivot, aggFns) {
         // 提前遍历获得所有新列名，保证行数据的完整性 test: groupDataframe pivot with uncompelete data
         const newColumnNames = this.df.getValues(columnToPivot);
         
-        const data = this.gData.map(gRow => {
-            const { [gRows]: df, ...rest } = gRow;
-            // { name: 'foo',  [gRows]: }
-            // { name: 'bar',  [gRows]: }
-            // to
+        if (!Array.isArray(aggFns)) {
+            aggFns = [aggFns];
+        }
+
+        const datas = aggFns.map(aggFn => this._pivotAgg(columnToPivot, newColumnNames, aggFn));
+        
+        if (datas.length > 1) {
+            return datas.map(data => new DataFrame(data));
+        } else {
+            return new DataFrame(datas[0]);
+        }
+    }
+
+    // [{ date: '01', [gRows]: df } { date: '02', [gRows]: df }]
+    // [{ date: '01', foo: 1, bar: 2 } { date: '02', foo: 3, bar: 4 }]
+    _pivotAgg(columnToPivot, newColumnNames, aggFn) {
+        return this.gData.map(gRow => {
+            const { [gRows]: df, ...groups } = gRow;
+            // { name: 'foo',  [gRows]: } { name: 'bar',  [gRows]: }
             // { foo: aggFn(foo's rows), bar: aggFn(bar's rows)}
             const gdf = df.groupBy(columnToPivot);
 
@@ -114,10 +128,8 @@ export class GroupDataFrame {
                 ret[newColumnName] = df.agg(aggFn);
                 return ret;
             }, newRowInit);
-            return {...newRow, ...rest };
+            return {...newRow, ...groups };
         });
-
-        return new DataFrame(data);
     }
 
     agg(fn) {

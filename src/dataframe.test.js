@@ -82,15 +82,6 @@ test('groupDataframe groupBy', () => {
 });
 
 test('groupDataframe pivot', () => {
-    const df = new DataFrame(data).groupBy('date').pivot('name', aggFn.sum('value'))
-    
-    expect(df.rows).toStrictEqual([
-        { date: '2020-01-01', foo: 1, bar: 2 },
-        { date: '2020-01-02', foo: 3, bar: 4 }
-    ])
-})
-
-test('groupDataframe pivot agg value', () => {
     const data = [
         { date: '2020-01-01', name: 'foo', value: 1 },
         { date: '2020-01-01', name: 'foo', value: 2 },
@@ -117,6 +108,27 @@ test('groupDataframe pivot with uncompelete data', () => {
     expect(df.rows).toStrictEqual([
         { date: '2020-01-01', foo: 1, bar: 0 },
         { date: '2020-01-02', foo: 0, bar: 4 }
+    ])
+})
+
+test('groupDataframe pivot with multiple aggregation function', () => {
+    const data = [
+        { date: '2020-01-01', name: 'foo', in: 1, out: 11 },
+        { date: '2020-01-01', name: 'bar', in: 2, out: 12 },
+        { date: '2020-01-02', name: 'foo', in: 3, out: 13 },
+        { date: '2020-01-02', name: 'bar', in: 4, out: 14 },
+        { date: '2020-01-02', name: 'bar', in: 6, out: 6 }
+    ]
+
+    const [inDf, outDf] = new DataFrame(data).groupBy('date').pivot('name', [aggFn.sum('in'), aggFn.sum('out')])
+    
+    expect(inDf.rows).toStrictEqual([
+        { date: '2020-01-01', foo: 1, bar: 2 },
+        { date: '2020-01-02', foo: 3, bar: 10 },
+    ])
+    expect(outDf.rows).toStrictEqual([
+        { date: '2020-01-01', foo: 11, bar: 12 },
+        { date: '2020-01-02', foo: 13, bar: 20 },
     ])
 })
 

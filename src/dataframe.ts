@@ -23,24 +23,30 @@ interface NameMapping {
 export class DataFrame {
     rows: Row[];
     values: Values;
+    columns: string[]; // columns为row有哪些列。
 
     constructor(rows: Row[]) {
         this.rows = rows;
         this.values = {};
+        this.columns = rows.length ? Object.keys(rows[0]) : [];
     }
 
-    groupBy(column: string) {
+    groupBy(expr: string) {
+        const exprFn = genExprFn(expr, this.columns);
+        // { group1: [row, row, row],  group2: [row, row, row]}
         const g = this.rows.reduce((g: Values, row) => {
-            if(g[row[column]]) {
-                g[row[column]].push(row);
+            const groupName = exprFn.apply(null, this.getRowValues(row))
+            if(g[groupName]) {
+                g[groupName].push(row);
             } else {
-                g[row[column]] = [row];
+                g[groupName] = [row];
             }
             return g;
         }, {});
-
+        // [ { expr: group1, [gRows]: df([row, row, row]) } 
+        //   { expr: group2, [gRows]: df([row, row, row]) } ]
         const g2 = Object.entries(g).map(([colValue, rows])=>
-            ({ [column]: rows[0][column], [gRows]: new DataFrame(rows) })
+            ({ [expr]: exprFn.apply(null, this.getRowValues(rows[0])), [gRows]: new DataFrame(rows) })
         );
 
         return new GroupDataFrame(this, g2);
@@ -72,6 +78,10 @@ export class DataFrame {
             this.values[column] = Array.from(set);
         }
         return this.values[column];
+    }
+
+    getRowValues(row: Row) {
+        return this.columns.map(colName => row[colName]);
     }
 }
 
@@ -243,4 +253,8 @@ function parser(tokens: Token[]) {
         }
     }
     return new Function('row', str);
+}
+
+export function genExprFn(expr: string, keys: string[]) {
+    return new Function(`return function (${keys.join(',')}) { return ${expr}}`)();
 }

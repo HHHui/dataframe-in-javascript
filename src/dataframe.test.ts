@@ -1,4 +1,4 @@
-import { DataFrame, GroupDataFrame, gRows, aggFn, col } from "./dataframe";
+import { DataFrame, GroupDataFrame, gRows, aggFn, col, genExprFn } from "./dataframe";
 
 
 const data = [
@@ -22,20 +22,20 @@ test('dataframe groupBy', () => {
     ]);
 });
 
-xtest('dataframe groupBy with calc', () => {
-    // const data = [
-    //     { date: '2020-01-01 00', value: 1 },
-    //     { date: '2020-01-01 01', value: 2 },
-    //     { date: '2020-01-02 00', value: 3 },
-    //     { date: '2020-01-02 01', value: 4 }
-    // ]
+test('dataframe groupBy expr', () => {
+    const data = [
+        { date: '2020-01-01 00', value: 1 },
+        { date: '2020-01-01 01', value: 2 },
+        { date: '2020-01-02 00', value: 3 },
+        { date: '2020-01-02 01', value: 4 }
+    ]
 
-    // const df = new DataFrame(data).groupBy(col('date').expr(v => v.substr(0, 10))).agg(aggFn.sum('value'));
+    const df = new DataFrame(data).groupBy('date.substr(0, 10)').agg(aggFn.sum('value'));
 
-    // expect(df.rows).toStrictEqual([
-    //     { date: '2020-01-01', value: 3 },
-    //     { date: '2020-01-02', value: 7 }
-    // ]);
+    expect(df.rows).toStrictEqual([
+        { 'date.substr(0, 10)': '2020-01-01', 'sum(value)': 3 },
+        { 'date.substr(0, 10)': '2020-01-02', 'sum(value)': 7 }
+    ]);
 });
 
 test('dataframe getValues', () => {
@@ -71,16 +71,6 @@ test('dataframe select support one column +-*/', () => {
         { 'value + 1': 4 },
         { 'value + 1': 5 }
     ]);
-})
-
-xtest('dataframe select cloumns', () => {
-    // const df = new DataFrame(data).select('name', 'value');
-    // expect(df.rows).toStrictEqual([
-    //     { value: 1, name: 'foo' },
-    //     { value: 2, name: 'bar' },
-    //     { value: 3, name: 'foo' },
-    //     { value: 4, name: 'bar' }
-    // ]);
 })
 // select expr end
 
@@ -138,14 +128,14 @@ test('groupDataframe pivot with uncompelete data', () => {
 
 test('groupDataframe pivot with multiple aggregation function', () => {
     const data = [
-        { date: '2020-01-01', name: 'foo', in: 1, out: 11 },
-        { date: '2020-01-01', name: 'bar', in: 2, out: 12 },
-        { date: '2020-01-02', name: 'foo', in: 3, out: 13 },
-        { date: '2020-01-02', name: 'bar', in: 4, out: 14 },
-        { date: '2020-01-02', name: 'bar', in: 6, out: 6 }
+        { date: '2020-01-01', name: 'foo', input: 1, output: 11 },
+        { date: '2020-01-01', name: 'bar', input: 2, output: 12 },
+        { date: '2020-01-02', name: 'foo', input: 3, output: 13 },
+        { date: '2020-01-02', name: 'bar', input: 4, output: 14 },
+        { date: '2020-01-02', name: 'bar', input: 6, output: 6 }
     ]
 
-    const [inDf, outDf] = new DataFrame(data).groupBy('date').pivot('name', [aggFn.sum('in'), aggFn.sum('out')])
+    const [inDf, outDf] = new DataFrame(data).groupBy('date').pivot('name', [aggFn.sum('input'), aggFn.sum('output')])
     
     expect(inDf.rows).toStrictEqual([
         { date: '2020-01-01', foo: 1, bar: 2 },
@@ -190,3 +180,15 @@ test('groupDataframe should have its parent dataframe ref', () => {
 
     expect(gdf.df).toBe(df);
 });
+
+test.todo('genExprFn with column name is reserved words', () => {
+    const data = [
+        { date: '2019-01-01', in: 1 },
+        { date: '2019-01-01', in: 2 },
+        { date: '2019-01-02', in: 3 }
+    ];
+    genExprFn('date', ['date', 'in']);
+    // this will cause eval this code, and "in" was a javascript reserved word, so cause error.
+    // return function (date, in) { return date }
+    // so maybe i should update expr to prefix context. like 'date' to row.tate, row.in
+})

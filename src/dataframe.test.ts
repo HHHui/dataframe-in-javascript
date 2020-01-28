@@ -38,6 +38,25 @@ test('dataframe groupBy expr', () => {
     ]);
 });
 
+test('dataframe rename', () => {
+    const data = [
+        { date: '2020-01-01 00', value: 1, other: 'foo' },
+        { date: '2020-01-01 01', value: 2, other: 'foo' },
+        { date: '2020-01-02 00', value: 3, other: 'foo' },
+        { date: '2020-01-02 01', value: 4, other: 'foo' }
+    ]
+
+    const df = new DataFrame(data)
+        .groupBy('date.substr(0, 10)')
+        .agg(aggFn.sum('value'))
+        .rename({'date.substr(0, 10)': 'date', 'sum(value)': 'sum'}, (key) => `${key}s`);
+
+    expect(df.rows).toStrictEqual([
+        { 'date': '2020-01-01', 'sum': 3 },
+        { 'date': '2020-01-02', 'sum': 7 }
+    ]);
+});
+
 test('dataframe getValues', () => {
     const data = [
         { date: '2020-01-01', name: 'foo' },

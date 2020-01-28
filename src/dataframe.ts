@@ -83,6 +83,29 @@ export class DataFrame {
     getRowValues(row: Row) {
         return this.columns.map(colName => row[colName]);
     }
+
+    // make sure data completion before rename
+    rename(sMap: { [key: string]: string }, dMap?: (key: string) => string) {
+        this.rows = this.rows.map((row: Row) => {
+            const renamed: Row =  {};
+            this.columns.forEach((key: string) => {
+                if (sMap[key]) {
+                    renamed[sMap[key]] = row[key];
+                } else if (dMap) {
+                    renamed[dMap(key)] = row[key];
+                } else {
+                    renamed[key] = row[key];
+                }
+            });
+            return renamed;
+        });
+        this.columns = this.rows.length ? Object.keys(this.rows[0]) : [];
+        return this;
+    }
+
+    getColumns(...except: string[]) {
+        return this.columns.filter(column => !except.includes(column));
+    }
 }
 
 
@@ -159,35 +182,18 @@ export class GroupDataFrame {
         });
     }
 
-    agg(fn: AggFn) {
+    agg(...fns: AggFn[]) {
         const data = this.gData.map(gRow => {
             const { [gRows]: dataFrame, ...rest } = gRow;
-            const [key, value] = fn(dataFrame);
-            return { ...rest, [key]: value };
+            const ret = fns.reduce((ret: Row, fn) => {
+                const [key, value] = fn(dataFrame);
+                ret[key] = value;
+                return ret;
+            }, {});
+            return { ...rest, ...ret };
         });
         return new DataFrame(data);
     }
-}
-
-export class Col {
-    name: string;
-    renameTemplate?: string;
-
-    constructor(name: string) {
-        this.name = name;
-    }
-    as(renameTemplate: string) {
-        this.renameTemplate = renameTemplate;
-        return this;
-    }
-    transform(curValue: any) {
-        if(!this.renameTemplate) return curValue;
-        return this.renameTemplate.replace('${cv}', curValue);
-    }
-}
-
-export function col(name: string) {
-    return new Col(name);
 }
 
 export const aggFn = {

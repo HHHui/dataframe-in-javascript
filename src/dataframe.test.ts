@@ -1,4 +1,4 @@
-import { DataFrame, GroupDataFrame, gRows, aggFn, col, genExprFn } from "./dataframe";
+import { DataFrame, GroupDataFrame, gRows, aggFn } from "./dataframe";
 
 
 const data = [
@@ -102,15 +102,6 @@ test('groupDataframe pivot', () => {
     ])
 })
 
-test('groupDataframe pivot rename', () => {
-    const df = new DataFrame(data).groupBy('date').pivot(col('name').as('${cv}Value'), aggFn.sum('value'))
-
-    expect(df.rows).toStrictEqual([
-        { date: '2020-01-01', fooValue: 1, barValue: 2 },
-        { date: '2020-01-02', fooValue: 3, barValue: 4 },
-    ])
-})
-
 test('groupDataframe pivot with uncompelete data', () => {
 
     const data = [
@@ -180,15 +171,3 @@ test('groupDataframe should have its parent dataframe ref', () => {
 
     expect(gdf.df).toBe(df);
 });
-
-test.todo('genExprFn with column name is reserved words', () => {
-    const data = [
-        { date: '2019-01-01', in: 1 },
-        { date: '2019-01-01', in: 2 },
-        { date: '2019-01-02', in: 3 }
-    ];
-    genExprFn('date', ['date', 'in']);
-    // this will cause eval this code, and "in" was a javascript reserved word, so cause error.
-    // return function (date, in) { return date }
-    // so maybe i should update expr to prefix context. like 'date' to row.tate, row.in
-})

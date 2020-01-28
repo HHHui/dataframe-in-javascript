@@ -116,24 +116,18 @@ export class GroupDataFrame {
     
     // pivot
     // 将columnToPivot这一列数据，变成新的列，数据聚合内容
-    pivot(nameOrCol: string | Col, aggFns: AggFn): DataFrame;
-    pivot(nameOrCol: string | Col, aggFns: AggFn[]): DataFrame[];
-    pivot(nameOrCol: string | Col, aggFns: AggFn | AggFn[]) {
+    pivot(columnToPivot: string, aggFns: AggFn): DataFrame;
+    pivot(columnToPivot: string, aggFns: AggFn[]): DataFrame[];
+    pivot(columnToPivot: string, aggFns: AggFn | AggFn[]) {
         // 提前遍历获得所有新列名，保证行数据的完整性 test: groupDataframe pivot with uncompelete data
-        const col = toCol(nameOrCol);
-        const newColumnNames = this.df.getValues(col.name);
-        // if col as exists
-        const newColumnNameMappings = col.renameTemplate ? 
-            newColumnNames.reduce((prev, cv) => {
-                prev[cv] = col.transform(cv);
-                return prev;
-            }, {}) : null;
+        // 提前遍历获得所有新列名，保证行数据的完整性 test: groupDataframe pivot with uncompelete data
+        const newColumnNames = this.df.getValues(columnToPivot);
 
         if (!Array.isArray(aggFns)) {
             aggFns = [aggFns];
         }
 
-        const datas = aggFns.map(aggFn => this._pivotAgg(col.name, newColumnNames, aggFn, newColumnNameMappings));
+        const datas = aggFns.map(aggFn => this._pivotAgg(columnToPivot, newColumnNames, aggFn));
         
         if (datas.length > 1) {
             return datas.map(data => new DataFrame(data));
@@ -144,7 +138,7 @@ export class GroupDataFrame {
 
     // [{ date: '01', [gRows]: df } { date: '02', [gRows]: df }]
     // [{ date: '01', foo: 1, bar: 2 } { date: '02', foo: 3, bar: 4 }]
-    _pivotAgg(columnToPivot: string, newColumnNames: string[], aggFn: AggFn, newColumnNameMappings: NameMapping) {
+    private _pivotAgg(columnToPivot: string, newColumnNames: string[], aggFn: AggFn) {
         return this.gData.map(gRow => {
             const { [gRows]: df, ...groups } = gRow;
             // { name: 'foo',  [gRows]: } { name: 'bar',  [gRows]: }
@@ -156,18 +150,10 @@ export class GroupDataFrame {
                 return ret;
             }, {});
 
-            let newRow = gdf.gData.reduce((ret: Row, { [gRows]: df, [columnToPivot]: newColumnName }) => {
+            const newRow = gdf.gData.reduce((ret: Row, { [gRows]: df, [columnToPivot]: newColumnName }) => {
                 ret[newColumnName] = df.agg(aggFn);
                 return ret;
             }, newRowInit);
-
-            // if col as exists
-            if(newColumnNameMappings) {
-                newRow = newColumnNames.reduce((ret: Row, colName) => {
-                    ret[newColumnNameMappings[colName]] = newRow[colName];
-                    return ret;
-                }, {});
-            }
 
             return {...newRow, ...groups };
         });
@@ -197,14 +183,6 @@ export class Col {
     transform(curValue: any) {
         if(!this.renameTemplate) return curValue;
         return this.renameTemplate.replace('${cv}', curValue);
-    }
-}
-
-function toCol(nameOrCol: string | Col): Col {
-    if(nameOrCol instanceof Col) {
-        return nameOrCol;
-    } else {
-        return new Col(nameOrCol);
     }
 }
 

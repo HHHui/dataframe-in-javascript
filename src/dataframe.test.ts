@@ -1,4 +1,4 @@
-import {DataFrame, GroupDataFrame, gRows, aggFn, rowFn, toLineChart, toPieChart} from "./dataframe";
+import {DataFrame, GroupDataFrame, gRows, aggFn, rowFn, toLineChart, toPieChart, col} from "./dataframe";
 
 
 const data = [
@@ -76,7 +76,7 @@ test('dataframe rowAgg', () => {
         { date: '2020',a: 1, b: 2, c: 3 },
         { date: '2021',a: 3, b: 4, c: 5 },
     ]
-    const df = new DataFrame(data).rowAgg(rowFn.sum(['date'], 'total'));
+    const df = new DataFrame(data).rowAgg(rowFn.sum(['date'], col().as('total')));
     expect(df.rows).toStrictEqual([
         { date: '2020',a: 1, b: 2, c: 3, total: 6 },
         { date: '2021',a: 3, b: 4, c: 5, total: 12 },

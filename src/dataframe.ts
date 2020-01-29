@@ -22,13 +22,39 @@ interface NameMapping {
     [k: string]: string
 }
 
+class Col {
+    expr: string;
+    alias?: string;
+
+    constructor(expr: string = '') {
+        this.expr = expr;
+    }
+
+    as(alias: string) {
+        this.alias = alias;
+        return this;
+    }
+}
+
+function toCol(column: string | Col): Col {
+    if(column instanceof Col) {
+        return column
+    } else {
+        return new Col(column);
+    }
+}
+
+export function col(expr?: string) {
+    return new Col(expr);
+}
+
 // [ Row, Row, Row ]
 export class DataFrame {
     rows: Row[];
     values: Values;
 
     constructor(rows: Row[]) {
-        this.rows = rows;
+        this.rows = [...rows];
         this.values = {};
     }
 
@@ -36,8 +62,15 @@ export class DataFrame {
         return this.rows.length ? Object.keys(this.rows[0]) : [];
     }
 
-    groupBy(expr: string) {
+    filter(expr: string) {
         const exprFn = genExprFn(expr, this.columns);
+        this.rows = this.rows.filter(row => exprFn.apply(null, this.getRowValues(row)));
+        return this;
+    }
+
+    groupBy(column: string | Col): GroupDataFrame {
+        const col = toCol(column);
+        const exprFn = genExprFn(col.expr, this.columns);
         // { group1: [row, row, row],  group2: [row, row, row]}
         const g = this.rows.reduce((g: Values, row) => {
             const groupName = exprFn.apply(null, this.getRowValues(row))
@@ -51,17 +84,21 @@ export class DataFrame {
         // [ { expr: group1, [gRows]: df([row, row, row]) } 
         //   { expr: group2, [gRows]: df([row, row, row]) } ]
         const g2 = Object.entries(g).map(([colValue, rows])=>
-            ({ [expr]: exprFn.apply(null, this.getRowValues(rows[0])), [gRows]: new DataFrame(rows) })
+            ({ [col.alias || col.expr]: exprFn.apply(null, this.getRowValues(rows[0])), [gRows]: new DataFrame(rows) })
         );
 
         return new GroupDataFrame(this, g2);
     }
 
-    select(expr: string) {
-        const fn = parser(lexer(expr));
+    select(...colsOrColumns: Array<Col | string>): DataFrame {
+        const cols = colsOrColumns.map((colOrColumn: Col | string) => toCol(colOrColumn));
+        const fns = cols.map(col => genExprFn(col.expr, this.columns));
 
         const rows = this.rows.map(row => {
-            return { [expr]: fn(row) }
+            return fns.reduce((ret, fn, index) => {
+                ret[cols[index].alias || cols[index].expr] = fn.apply(null, this.getRowValues(row));
+                return ret;
+            }, {})
         });
 
         return new DataFrame(rows);
@@ -216,17 +253,18 @@ export class GroupDataFrame {
 }
 
 export const aggFn = {
-    sum: (column: string, alias?: string) => (df: DataFrame): [string, number] => {
+    sum: (columnOrCol: string | Col) => (df: DataFrame): [string, number] => {
+        const col = toCol(columnOrCol);
         const { rows } = df;
-        const value = rows.reduce((prev, row) => prev + (row[column] || 0), 0);
-        return [alias || column, value];
+        const value = rows.reduce((prev, row) => prev + (row[col.expr] || 0), 0);
+        return [col.alias || col.expr, value];
     }
 };
 
 export const rowFn = {
-    sum: (expect: string[], alias?: string) => (df: DataFrame) => {
+    sum: (expect: string[], col?: Col) => (df: DataFrame) => {
         const { rows } = df;
-        const key = alias || 'sum';
+        const key = (col && col.alias) || 'sum';
         const columns = df.getColumns(...expect);
         rows.forEach(row => {
             row[key] = columns.reduce((sum, col) => {

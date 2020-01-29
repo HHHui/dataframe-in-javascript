@@ -68,6 +68,11 @@ export class DataFrame {
         return this;
     }
 
+    groupBys(columns: Array<string | Col>): DataFrame | GroupDataFrame {
+        const cols = columns.map(column => toCol(column));
+        return cols.reduce((ret : DataFrame | GroupDataFrame, col) => ret.groupBy(col), this);
+    }
+
     groupBy(column: string | Col): GroupDataFrame {
         const col = toCol(column);
         const exprFn = genExprFn(col.expr, this.columns);
@@ -104,8 +109,9 @@ export class DataFrame {
         return new DataFrame(rows);
     }
 
-    agg(fn: AggFn) {
-        return fn(this)[1];
+    agg(...fns: AggFn[]) {
+        return new GroupDataFrame(this, [{[gRows]: this}])
+            .agg(...fns);
     }
 
     // the order may need to reconsider.
@@ -185,10 +191,11 @@ export class GroupDataFrame {
     //   { pId: 'P1', country: 'US', rows: [Row] }
     //   { pId: 'P1', country: 'UK', rows: [Row, Row] }
     // ]
-    groupBy(column: string) {
+    groupBy(column: string | Col) {
+        const col = toCol(column);
         const gData = this.gData.flatMap(gRow => {
             const { [gRows]: dataFrame, ...rest } = gRow;
-            return dataFrame.groupBy(column).gData.map(gRow => ({ ...rest, ...gRow }));
+            return dataFrame.groupBy(col.expr).gData.map(gRow => ({ ...rest, ...gRow }));
         });
         return new GroupDataFrame(this.df, gData);
     }
@@ -230,7 +237,7 @@ export class GroupDataFrame {
             }, {});
 
             const newRow = gdf.gData.reduce((ret: Row, { [gRows]: df, [columnToPivot]: newColumnName }) => {
-                ret[newColumnName] = df.agg(aggFn);
+                ret[newColumnName] = aggFn(df)[1];
                 return ret;
             }, newRowInit);
 

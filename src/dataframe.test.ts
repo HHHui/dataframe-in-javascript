@@ -22,6 +22,21 @@ test('dataframe groupBy', () => {
     ]);
 });
 
+test('dataframe groupBys', () => {
+    const data = [
+        { date: '2020-01-01', name: 'foo', value: 1 },
+        { date: '2020-01-01', name: 'foo', value: 1 },
+        { date: '2020-01-01', name: 'bar', value: 2 }
+    ]
+
+    const df = new DataFrame(data).groupBys(['date', 'name']).agg(aggFn.sum('value'));
+
+    expect(df.rows).toStrictEqual([
+        { date: '2020-01-01', name: 'foo', value: 2 },
+        { date: '2020-01-01', name: 'bar', value: 2 }
+    ]);
+});
+
 test('dataframe groupBy expr', () => {
     const data = [
         { date: '2020-01-01 00', value: 1 },

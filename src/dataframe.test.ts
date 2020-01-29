@@ -1,4 +1,4 @@
-import { DataFrame, GroupDataFrame, gRows, aggFn } from "./dataframe";
+import {DataFrame, GroupDataFrame, gRows, aggFn, rowFn, toLineChart, toPieChart} from "./dataframe";
 
 
 const data = [
@@ -33,8 +33,8 @@ test('dataframe groupBy expr', () => {
     const df = new DataFrame(data).groupBy('date.substr(0, 10)').agg(aggFn.sum('value'));
 
     expect(df.rows).toStrictEqual([
-        { 'date.substr(0, 10)': '2020-01-01', 'sum(value)': 3 },
-        { 'date.substr(0, 10)': '2020-01-02', 'sum(value)': 7 }
+        { 'date.substr(0, 10)': '2020-01-01', 'value': 3 },
+        { 'date.substr(0, 10)': '2020-01-02', 'value': 7 }
     ]);
 });
 
@@ -49,11 +49,11 @@ test('dataframe rename', () => {
     const df = new DataFrame(data)
         .groupBy('date.substr(0, 10)')
         .agg(aggFn.sum('value'))
-        .rename({'date.substr(0, 10)': 'date', 'sum(value)': 'sum'}, (key) => `${key}s`);
+        .rename({'date.substr(0, 10)': 'date'}, (key) => `${key}s`);
 
     expect(df.rows).toStrictEqual([
-        { 'date': '2020-01-01', 'sum': 3 },
-        { 'date': '2020-01-02', 'sum': 7 }
+        { 'date': '2020-01-01', 'values': 3 },
+        { 'date': '2020-01-02', 'values': 7 }
     ]);
 });
 
@@ -70,6 +70,62 @@ test('dataframe getValues', () => {
     
     expect(values).toBe(df.values['name'])
 })
+
+test('dataframe rowAgg', () => {
+    const data = [
+        { date: '2020',a: 1, b: 2, c: 3 },
+        { date: '2021',a: 3, b: 4, c: 5 },
+    ]
+    const df = new DataFrame(data).rowAgg(rowFn.sum(['date'], 'total'));
+    expect(df.rows).toStrictEqual([
+        { date: '2020',a: 1, b: 2, c: 3, total: 6 },
+        { date: '2021',a: 3, b: 4, c: 5, total: 12 },
+    ]);
+});
+
+test('dataframe colAgg', () => {
+    const data = [
+        { date: '2020',a: 1, b: 2, c: 3 },
+        { date: '2021',a: 3, b: 4, c: 5 },
+    ]
+    const df = new DataFrame(data).columnAgg('date', 'total' , [aggFn.sum('a'), aggFn.sum('b')]);
+    expect(df.rows).toStrictEqual([
+        { date: '2020',a: 1, b: 2, c: 3 },
+        { date: '2021',a: 3, b: 4, c: 5 },
+        { date: 'total', a: 4, b: 6 }
+    ]);
+});
+
+test('toChartLine', () => {
+    const data = [
+        { date: '2020',a: 1, b: 2, c: 3 },
+        { date: '2021',a: 3, b: 4, c: 5 },
+    ]
+    const chartData = toLineChart(new DataFrame(data), 'date');
+    expect(chartData).toStrictEqual({
+        categories: ['2020', '2021'],
+        legends: ['a', 'b', 'c'],
+        series: {
+            a: [1,3],
+            b: [2,4],
+            c: [3,5]
+        }
+    });
+});
+
+test('toPieChart', () => {
+    const data = [
+        { zone: 'a', count: 1},
+        { zone: 'b', count: 2},
+        { zone: 'c', count: 3}
+    ];
+    const chartData = toPieChart(new DataFrame(data), 'zone', 'count');
+    expect(chartData).toStrictEqual([
+        { name: 'a', value: 1},
+        { name: 'b', value: 2},
+        { name: 'c', value: 3}
+    ]);
+});
 
 // select expr
 test('dataframe select one cloumn', () => {
@@ -162,8 +218,8 @@ test('groupDataframe agg sum', () => {
     
     expect(df).toBeInstanceOf(DataFrame);
     expect(df.rows).toStrictEqual([
-        { date: '2020-01-01', 'sum(value)': 3 },
-        { date: '2020-01-02', 'sum(value)': 7 }
+        { date: '2020-01-01', 'value': 3 },
+        { date: '2020-01-02', 'value': 7 }
     ])
 })
 
@@ -179,8 +235,8 @@ test('groupDataframe agg sum with data has null value', () => {
     
     expect(df).toBeInstanceOf(DataFrame);
     expect(df.rows).toStrictEqual([
-        { date: '2020-01-01', 'sum(value)': 1 },
-        { date: '2020-01-02', 'sum(value)': 0 }
+        { date: '2020-01-01', 'value': 1 },
+        { date: '2020-01-02', 'value': 0 }
     ])
 })
 

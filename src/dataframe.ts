@@ -11,6 +11,9 @@ interface Values {
 interface AggFn {
     (df: DataFrame): [string, any]
 }
+interface RowFn {
+    (df: DataFrame): any
+}
 interface Group {
     [gRows]: DataFrame;
     [k: string]: any;
@@ -23,12 +26,14 @@ interface NameMapping {
 export class DataFrame {
     rows: Row[];
     values: Values;
-    columns: string[]; // columns为row有哪些列。
 
     constructor(rows: Row[]) {
         this.rows = rows;
         this.values = {};
-        this.columns = rows.length ? Object.keys(rows[0]) : [];
+    }
+
+    get columns(): string[] {
+        return this.rows.length ? Object.keys(this.rows[0]) : [];
     }
 
     groupBy(expr: string) {
@@ -99,12 +104,26 @@ export class DataFrame {
             });
             return renamed;
         });
-        this.columns = this.rows.length ? Object.keys(this.rows[0]) : [];
         return this;
     }
 
     getColumns(...except: string[]) {
         return this.columns.filter(column => !except.includes(column));
+    }
+
+    rowAgg(...fns: RowFn[]) {
+        fns.forEach(fn => fn(this));
+        return this;
+    }
+
+    columnAgg(nameCol: string, name: string, fns: AggFn[]) {
+        const summary = fns.reduce((ret: Row, fn) => {
+            const [column, value] = fn(this);
+            ret[column] = value;
+            return ret;
+        }, {});
+        this.rows.push({ [nameCol]: name, ...summary });
+        return this;
     }
 }
 
@@ -197,11 +216,23 @@ export class GroupDataFrame {
 }
 
 export const aggFn = {
-    sum: (column: string) => (df: DataFrame): [string, number] => {
+    sum: (column: string, alias?: string) => (df: DataFrame): [string, number] => {
         const { rows } = df;
-        const key = `sum(${column})`;
         const value = rows.reduce((prev, row) => prev + (row[column] || 0), 0);
-        return [key, value];
+        return [alias || column, value];
+    }
+};
+
+export const rowFn = {
+    sum: (expect: string[], alias?: string) => (df: DataFrame) => {
+        const { rows } = df;
+        const key = alias || 'sum';
+        const columns = df.getColumns(...expect);
+        rows.forEach(row => {
+            row[key] = columns.reduce((sum, col) => {
+                return sum + row[col] || 0;
+            }, 0);
+        })
     }
 };
 
@@ -209,6 +240,7 @@ interface Token {
     type: string,
     value: any
 }
+
 function lexer(expr: string): Token[] {
     const tokens = [];
     for (let word of expr.split(/\s+/)) {
@@ -241,4 +273,21 @@ function parser(tokens: Token[]) {
 
 export function genExprFn(expr: string, keys: string[]) {
     return new Function(`return function (${keys.join(',')}) { return ${expr}}`)();
+}
+
+export function toLineChart(df: DataFrame, categoryKey: string) {
+    const legends = df.getColumns(categoryKey);
+    return {
+        legends,
+        categories: df.rows.map(r => r[categoryKey]),
+        series: legends.reduce((ret: any, legend) => {
+            ret[legend] = df.rows.map(r => r[legend])
+            return ret;
+        }, {})
+    }
+}
+
+// data [{ name: xx, value: 123}, { name: xx, value: 123}]
+export function toPieChart(df: DataFrame, nameCol: string, valueCol: string) {
+    return df.rows.map(row => ({ name: row[nameCol], value: row[valueCol] }));
 }

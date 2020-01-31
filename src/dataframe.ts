@@ -21,6 +21,7 @@ interface Group {
 interface NameMapping {
     [k: string]: string
 }
+type Order = 'asc' | 'desc';
 
 class Col {
     expr: string;
@@ -154,6 +155,17 @@ export class DataFrame {
         return this.columns.filter(column => !except.includes(column));
     }
 
+    // similar to rowAgg and select expr, but more convinence when add cumputed property
+    withColumn(columnName: string, expr: ((row: Row) => any) | string) {
+        if(typeof expr === 'string') {
+            const exprFn = genExprFn(expr, this.columns);
+            this.rows.forEach(row => row[columnName] = exprFn.apply(null, this.getRowValues(row)));
+        } else {
+            this.rows.forEach(row => row[columnName] = expr(row));
+        }
+        return this;
+    }
+
     rowAgg(...fns: RowFn[]) {
         fns.forEach(fn => fn(this));
         return this;
@@ -168,7 +180,37 @@ export class DataFrame {
         this.rows.push({ [nameCol]: name, ...summary });
         return this;
     }
+
+    orderBy(cols: string | string[], orders: Order | Order[] = ['desc']): DataFrame {
+        // make cols and orders same length array
+        cols = Array.isArray(cols) ? cols : [cols];
+        orders = Array.isArray(orders) ? orders : [orders];
+        while (orders.length < cols.length) {
+            orders.push('desc');
+        }
+        if(cols.length === 0) return this;
+        this.rows.sort((a, b) => {
+            let i = 0;
+            while (i < cols.length) {
+                const col = cols[i];
+                const order = (orders[i] === 'asc' ? 1 : -1);
+                if (a[col] > b[col]) {
+                    return order
+                } else if (a[col] < b[col]) {
+                    return -order
+                } else if (i === cols.length - 1) {
+                    return 0;
+                } else {
+                    i++
+                }
+            }
+            throw Error('orderBy Method is wrong');
+            return 0;
+        });
+        return this;
+    }
 }
+
 
 
 
@@ -278,6 +320,15 @@ export const rowFn = {
                 return sum + row[col] || 0;
             }, 0);
         })
+    },
+    percent: (columnOrCol: string | Col, withPercentSign = true) => (df: DataFrame) => {
+        const col = toCol(columnOrCol);
+        const key = col.alias || 'percent';
+        const total = aggFn.sum(col.expr)(df)[1];
+        df.rows.forEach(row => {
+            const percent = total ? (row[col.expr] / total) : 0;
+            row[key] = withPercentSign ? (percent * 100).toFixed(2) + '%' : Number((percent * 100).toFixed(2));
+        });
     }
 };
 
@@ -320,19 +371,31 @@ export function genExprFn(expr: string, keys: string[]) {
     return new Function(`return function (${keys.join(',')}) { return ${expr}}`)();
 }
 
-export function toLineChart(df: DataFrame, categoryKey: string) {
-    const legends = df.getColumns(categoryKey);
+// legend 默认除了category的所有列
+//        string[] 选择这几列作为legend
+//        { [key: string]: string } 选择key这几列, 并且改名
+export function toLineChart(df: DataFrame, categoryKey: string, legendOpt?: string[] | { [key: string]: string }) {
+    let legends, columns, isObject = false;
+    if (!legendOpt) {
+        columns = legends = df.getColumns(categoryKey);
+    } else if (Array.isArray(legendOpt)) {
+        columns = legends = legendOpt;
+    } else {
+        columns = Object.keys(legendOpt);
+        legends = columns.map(col => legendOpt[col]);
+        isObject = true;
+    }
     return {
         legends,
         categories: df.rows.map(r => r[categoryKey]),
-        series: legends.reduce((ret: any, legend) => {
-            ret[legend] = df.rows.map(r => r[legend])
+        series: columns.reduce((ret: any, col) => {
+            ret[isObject ? (legendOpt as any)[col]: col] = df.rows.map(r => r[col])
             return ret;
         }, {})
     }
 }
 
 // data [{ name: xx, value: 123}, { name: xx, value: 123}]
-export function toPieChart(df: DataFrame, nameCol: string, valueCol: string) {
+export function toPieChart(df: DataFrame, nameCol: string = 'name', valueCol: string = 'value') {
     return df.rows.map(row => ({ name: row[nameCol], value: row[valueCol] }));
 }

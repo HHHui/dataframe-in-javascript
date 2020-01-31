@@ -86,7 +86,7 @@ test('dataframe getValues', () => {
     expect(values).toBe(df.values['name'])
 })
 
-test('dataframe rowAgg', () => {
+test('dataframe rowAgg sum', () => {
     const data = [
         { date: '2020',a: 1, b: 2, c: 3 },
         { date: '2021',a: 3, b: 4, c: 5 },
@@ -95,6 +95,30 @@ test('dataframe rowAgg', () => {
     expect(df.rows).toStrictEqual([
         { date: '2020',a: 1, b: 2, c: 3, total: 6 },
         { date: '2021',a: 3, b: 4, c: 5, total: 12 },
+    ]);
+});
+
+test('dataframe rowAgg percent', () => {
+    const data = [
+        { date: '2020',a: 1, b: 2, c: 3 },
+        { date: '2021',a: 3, b: 4, c: 5 },
+    ]
+    const df = new DataFrame(data).rowAgg(rowFn.percent(col('a').as('aPercent')));
+    expect(df.rows).toStrictEqual([
+        { date: '2020',a: 1, b: 2, c: 3, aPercent: "25.00%" },
+        { date: '2021',a: 3, b: 4, c: 5, aPercent: "75.00%" },
+    ]);
+});
+
+test('dataframe withColumns', () => {
+    const data = [
+        { date: '2020',a: 1, b: 2 },
+        { date: '2021',a: 3, b: 4 },
+    ]
+    const df = new DataFrame(data).withColumn('a/b', 'a/b');
+    expect(df.rows).toStrictEqual([
+        { date: '2020',a: 1, b: 2, 'a/b': 0.5 },
+        { date: '2021',a: 3, b: 4, 'a/b': 0.75 },
     ]);
 });
 
@@ -111,6 +135,25 @@ test('dataframe colAgg', () => {
     ]);
 });
 
+test('dataframe orderBy', () => {
+    const data = [
+        { a: '2', b: 2 },
+        { a: '2', b: 1 },
+        { a: '5', b: 1 },
+        { a: '3', b: 1 },
+        { a: '7', b: 1 }
+    ];
+    const df = new DataFrame(data)
+        .orderBy(['a', 'b'], ['desc', 'asc']);
+    expect(df.rows).toStrictEqual([
+        { a: '7', b: 1 },
+        { a: '5', b: 1 },
+        { a: '3', b: 1 },
+        { a: '2', b: 1 },
+        { a: '2', b: 2 },
+    ]);
+});
+
 test('toChartLine', () => {
     const data = [
         { date: '2020',a: 1, b: 2, c: 3 },
@@ -124,6 +167,26 @@ test('toChartLine', () => {
             a: [1,3],
             b: [2,4],
             c: [3,5]
+        }
+    });
+
+    const chartData2 = toLineChart(new DataFrame(data), 'date', ['b', 'c']);
+    expect(chartData2).toStrictEqual({
+        categories: ['2020', '2021'],
+        legends: ['b', 'c'],
+        series: {
+            b: [2,4],
+            c: [3,5]
+        }
+    });
+
+    const chartData3 = toLineChart(new DataFrame(data), 'date', { c: 'C', b: 'B', });
+    expect(chartData3).toStrictEqual({
+        categories: ['2020', '2021'],
+        legends: ['C', 'B'],
+        series: {
+            B: [2,4],
+            C: [3,5]
         }
     });
 });

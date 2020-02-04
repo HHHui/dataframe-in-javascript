@@ -8,6 +8,14 @@ const data = [
     { date: '2020-01-02', name: 'bar', value: 4 }
 ]
 
+test('dataframe top', () => {
+    const df = new DataFrame(data).top(2);
+    expect(df.rows).toStrictEqual([
+        { date: '2020-01-01', name: 'foo', value: 1 },
+        { date: '2020-01-01', name: 'bar', value: 2 },
+    ]);
+})
+
 test('dataframe groupBy', () => {
     const gdf = new DataFrame(data).groupBy('date');
 
@@ -122,6 +130,43 @@ test('dataframe withColumns', () => {
     ]);
 });
 
+test('dataframe mapEnum', () => {
+    const data = [
+        { date: '2020', type: 1 },
+        { date: '2021', type: 2 },
+        { date: '2021', type: 3 },
+        { date: '2021', type: 10000},
+    ];
+    const options = {
+        1: 'one',
+        2: 'two',
+        3: 'three',
+    };
+    const df = new DataFrame(data).mapEnum(col('type').as('foo'), options, 'unknown');
+    expect(df.rows).toStrictEqual([
+        { date: '2020', type: 1, foo: 'one' },
+        { date: '2021', type: 2, foo: 'two' },
+        { date: '2021', type: 3, foo: 'three' },
+        { date: '2021', type: 10000, foo: 'unknown' },
+    ]);
+});
+
+test('dataframe mapBool', () => {
+    const data = [
+        { date: '2020' },
+        { date: '2021' },
+        { date: '2021' },
+        { date: null },
+    ];
+    const df = new DataFrame(data).mapBool(col('date').as('foo'), 'yes', 'no');
+    expect(df.rows).toStrictEqual([
+        { date: '2020', foo: 'yes' },
+        { date: '2021', foo: 'yes' },
+        { date: '2021', foo: 'yes' },
+        { date: null, foo: 'no' },
+    ]);
+});
+
 test('dataframe colAgg', () => {
     const data = [
         { date: '2020',a: 1, b: 2, c: 3 },
@@ -197,8 +242,9 @@ test('toPieChart', () => {
         { zone: 'b', count: 2},
         { zone: 'c', count: 3}
     ];
-    const chartData = toPieChart(new DataFrame(data), 'zone', 'count');
-    expect(chartData).toStrictEqual([
+    const { data: pData, legends } = toPieChart(new DataFrame(data), 'zone', 'count');
+    expect(legends).toStrictEqual(['a', 'b', 'c']);
+    expect(pData).toStrictEqual([
         { name: 'a', value: 1},
         { name: 'b', value: 2},
         { name: 'c', value: 3}

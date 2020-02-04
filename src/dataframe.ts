@@ -63,6 +63,12 @@ export class DataFrame {
         return this.rows.length ? Object.keys(this.rows[0]) : [];
     }
 
+    top(num: number) {
+        this.values = {};
+        this.rows = this.rows.slice(0, num);
+        return this;
+    }
+
     filter(expr: string) {
         const exprFn = genExprFn(expr, this.columns);
         this.rows = this.rows.filter(row => exprFn.apply(null, this.getRowValues(row)));
@@ -94,6 +100,22 @@ export class DataFrame {
         );
 
         return new GroupDataFrame(this, g2);
+    }
+
+    mapEnum(column: string | Col, options: { [key: string]: string }, defaultValue?: any) {
+        const col = toCol(column);
+        this.rows.forEach(row => {
+            row[col.alias || col.expr] = (options[row[col.expr]] !== undefined) ? options[row[col.expr]] : defaultValue;
+        });
+        return this;
+    }
+
+    mapBool(column: string | Col, trueValue: any, falseValue: any) {
+        const col = toCol(column);
+        this.rows.forEach(row => {
+            row[col.alias || col.expr] = row[col.expr] ? trueValue : falseValue;
+        });
+        return this;
     }
 
     select(...colsOrColumns: Array<Col | string>): DataFrame {
@@ -307,6 +329,11 @@ export const aggFn = {
         const { rows } = df;
         const value = rows.reduce((prev, row) => prev + (row[col.expr] || 0), 0);
         return [col.alias || col.expr, value];
+    },
+    count: (columnOrCol: string | Col) => (df: DataFrame): [string, number] => {
+        const col = toCol(columnOrCol);
+        const value = df.rows.length;
+        return [col.alias || col.expr, value];
     }
 };
 
@@ -397,5 +424,8 @@ export function toLineChart(df: DataFrame, categoryKey: string, legendOpt?: stri
 
 // data [{ name: xx, value: 123}, { name: xx, value: 123}]
 export function toPieChart(df: DataFrame, nameCol: string = 'name', valueCol: string = 'value') {
-    return df.rows.map(row => ({ name: row[nameCol], value: row[valueCol] }));
+    return {
+        legends: df.getValues(nameCol),
+        data: df.rows.map(row => ({ name: row[nameCol], value: row[valueCol] })),
+    };
 }

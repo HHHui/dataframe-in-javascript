@@ -130,6 +130,22 @@ test('dataframe withColumns', () => {
     ]);
 });
 
+test('dataframe patch', () => {
+    const data = [
+        { date: '2020', type: 1 },
+        { date: '2021', type: 2 },
+        { date: '2021' },
+        { date: '2021', type: 3 },
+    ];
+    const df = new DataFrame(data).patch('type', 0);
+    expect(df.rows).toStrictEqual([
+        { date: '2020', type: 1 },
+        { date: '2021', type: 2 },
+        { date: '2021', type: 0 },
+        { date: '2021', type: 3 },
+    ])
+})
+
 test('dataframe mapEnum', () => {
     const data = [
         { date: '2020', type: 1 },

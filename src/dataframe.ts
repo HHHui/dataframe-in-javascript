@@ -102,6 +102,14 @@ export class DataFrame {
         return new GroupDataFrame(this, g2);
     }
 
+    patch(coulmnOrCol: string | Col, defaultValue: any) {
+        const col = toCol(coulmnOrCol);
+        this.rows.forEach(row => {
+            row[col.alias || col.expr] = row[col.expr] ? row[col.expr] : defaultValue;
+        })
+        return this;
+    }
+
     mapEnum(column: string | Col, options: { [key: string]: string }, defaultValue?: any) {
         const col = toCol(column);
         this.rows.forEach(row => {
